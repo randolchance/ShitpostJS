@@ -1,0 +1,141 @@
+.flex-container {
+    display: flex;
+    flex-direction: row;
+}
+
+body {
+    color: white;
+    background-color: black;
+}
+
+.shitEntries {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: black;
+    color: white;
+}
+
+.IFMM {
+    width: 50%;
+    margin: auto;
+    font-size: 600%;
+    text-align: center;
+    -webkit-transform:scale(2,1); /* Safari and Chrome */
+    -moz-transform:scale(2,1); /* Firefox */
+    -ms-transform:scale(2,1); /* IE 9 */
+    -o-transform:scale(2,1); /* Opera */
+    transform:scale(2,1); /* W3C */
+}
+
+h2 {
+    width: 50%;
+    margin: auto;
+    font-size: 250%;
+    text-align: center;
+    font-variant: small-caps;
+}
+
+.login {
+    width: 320px;
+    height: fit-content;
+    margin: auto;
+    padding: 10px;
+    border-style: solid;
+    border-width: 1px;
+}
+
+input[type=text], input[type=password]{
+    width: 20em;
+    padding: 4px;
+    border-radius: 2px;
+    border-style: none;
+}
+
+.submitButton {
+    padding: 12px 28px;
+    font-size: 16px;
+    border-radius: 4px;
+    background-color: #004d4d;
+    border-style: none;
+}
+
+.newEntry {
+    display: flex;
+    justify-content: center;
+}
+
+textarea {
+    resize: none;
+    border-style: hidden;
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    flex-direction: row;
+}
+
+.pageButton, .pageCurrent {
+    margin: 4px;
+    padding: 6px 10px;
+    border-style: solid;
+    border-width: 2px;
+    border-radius: 4px;
+}
+
+.pageButton {
+    text-decoration: none;
+    border-color: white;
+    color: white;
+}
+
+.pageButton:hover {
+    border-width: 4px;
+    padding: 4px 8px;
+}
+
+.pageCurrent {
+    border-color: black;
+    background-color: white;
+    color: black;
+    font-size: 105%;
+    font-weight: bold;
+}
+
+.Entry {
+    display: flex;
+    flex-direction: row;
+    margin: 5px;
+    width: fit-content;
+    height: fit-content;
+    border-radius: 4px;
+    background-color: rgba(255,255,255,0.10);
+}
+
+.Time {
+    font-size: 66%;
+}
+
+.User {
+    font-size: 95%;
+}
+
+.Stamp {
+    padding: 3px;
+    width: fit-content;
+    height: fit-content;
+    border-radius: 4px;
+    border-top-right-radius: 0px;
+    border-bottom-right-radius: 0px;
+    background-color: rgba(255,255,255,0.15);
+}
+
+.Shitpost {
+    padding: 10px 20px;
+    font-size: 110%;
+    border-radius: 4px;
+    border-top-left-radius: 0px;
+    background-color: rgba(255,255,255,0.3);
+}
