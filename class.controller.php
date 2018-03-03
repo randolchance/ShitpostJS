@@ -65,6 +65,7 @@ class controller
 
                 /*--- Populate shitpost array from model to pass back to view ---*/
                 case 'getShitposts':
+                    $firstID = (int)$_POST['vars']['lastID'];
                     $page = (int)$_POST['vars']['page'];
                     $postsPerPage = (int)$_POST['vars']['postsPerPage'];
 
@@ -80,52 +81,72 @@ class controller
 
                     // Count total number of pages based on posts per page
                     $postPagesTotal = (int)ceil(($posts / $postsPerPage));
-                    $page = (int)(($page != null) && ($page < $postPagesTotal)) ? $page : 0;
+                    $page = (($page != null) && ($page < $postPagesTotal)) ? $page : 0;
+                    $lastID = -1;
+                    if ($firstID >= 0) {
+                        // Get most recently added ID
+                        $lastID = (int)$this->shitdb->select(
+                            $this->shittable,
+                            "",
+                            "",
+                            "ID",
+                            array(
+                                "start" => $page * $postsPerPage,
+                                "number" => 1
+                            ),
+                            true
+                        )[0]['ID'];
+                        $numberOfPosts = ($lastID - $firstID);
+                    } else {
+                        $numberOfPosts = $postsPerPage;
+                    }
 
-                    // Get results for this page
-                    $resultArray = $this->shitdb->select(
-                        $this->shittable,
-                        "",
-                        "",
-                        "*",
-                        array(
-                            "start" => $page * $postsPerPage,
-                            "number" => $postsPerPage
-                        ),
-                        true
-                    );
-
-                    // Process retrieved results and store in viewResultArray
                     $viewResultArray = array();
-                    $currentPostDate = '';
-                    foreach ($resultArray as $result) {
-                        $shitID = $result["Id"];
+                    if ($numberOfPosts > 0) {
+                        // Get results for this page
+                        $numberOfPosts = ($numberOfPosts < $postsPerPage) ? $numberOfPosts : $postsPerPage;
+                        $resultArray = $this->shitdb->select(
+                            $this->shittable,
+                            "",
+                            "",
+                            "*",
+                            array(
+                                "start" => $page * $postsPerPage,
+                                "number" => $numberOfPosts
+                            ),
+                            true
+                        );
+                        // Process retrieved results and store in viewResultArray
+                        foreach ($resultArray as $result) {
+                            $shitID = $result['Id'];
 
-                        $dateArray = explode(" ", $result["Date"]);
-                        $shitDate = ($currentPostDate == $dateArray[0]) ? "" : $currentPostDate = $dateArray[0];
-                        $shitDate .= (date('Y-m-d') == $shitDate) ? " (Today)" : "";
+                            $dateArray = explode(" ", $result["Date"]);
+                            $shitDate = $dateArray[0];
 
-                        $shitTime = "@" . $dateArray[1];
+                            $shitTime = "@" . $dateArray[1];
 
-                        $shitUser = ($result["User"] != $user) ? $result["User"] : "You";
+                            $shitUser = ($result['User'] != $user) ? $result['User'] : "You";
 
-                        $shitPost = str_replace("\n", "<br>", $result["Shit"]);
-                        $shitPost = $this->make_clickable($shitPost);
+                            $shitPost = str_replace("\n", "<br>", $result['Shit']);
+                            $shitPost = $this->make_clickable($shitPost);
 
-                        array_push($viewResultArray, array(
-                            "shitID" => $shitID,
-                            "shitDate" => $shitDate,
-                            "shitTime" => $shitTime,
-                            "shitUser" => $shitUser,
-                            "shitPost" => $shitPost
-                        ));
+                            array_push($viewResultArray, array(
+                                "shitID" => $shitID,
+                                "shitDate" => $shitDate,
+                                "shitTime" => $shitTime,
+                                "shitUser" => $shitUser,
+                                "shitPost" => $shitPost
+                            ));
+                        }
                     }
 
                     // Encode results and pass it back to the view in json format
                     $returnVars = array(
                         "resultsArray" => $viewResultArray,
                         "totalPages" => $postPagesTotal,
-                        "page" => $page
+                        "page" => $page,
+                        "postsPerPage" => $postsPerPage,
+                        "lastID" => $lastID
                     );
                     echo json_encode($returnVars);
                     break;
