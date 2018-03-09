@@ -6,36 +6,9 @@ ShitpostView.prototype = {
 
     init: function() {
 
-        // span must be odd
-        this.span = 9;
-        this.postsPerPage = 25;
-        this.page = 0;
-        this.lastID = -1;
-        this.totalPages = null;
-        this.isFirstBuild = true;
-
-        // Replace with actual login stuff
-        this.user = 'D'; // Temporary user set
-
-        this.updateURL({
-            user: this.user,
-            page: this.page
-        });
-
-        this.operate();
-        /*
         var node = $('.main');
-        this.buildNewShitpostEntryView(node);
-        this.getShitposts();
-        this.pollShitposts();
-        */
-    },
+        this.buildLoginView(node);
 
-    operate: function() {
-        var node = $('.main');
-        this.buildNewShitpostEntryView(node);
-        this.getShitposts();
-        this.pollShitposts();
     },
 
     /*--- Define debug function ---*/
@@ -60,7 +33,47 @@ ShitpostView.prototype = {
         }
     },
 
+
     /*--- Define helper functions ---*/
+
+    getCookieValue: function(param) {
+        var pairs = document.cookie.split(';');
+        var results = {};
+        for (var i = 0; i < pairs.length; i++) {
+            var pair = pairs[i].split('=');
+            if (param) {
+                if (param == pair[0]) return pair[1];
+            } else {
+                results[pair[0]] = pair[1];
+            }
+        }
+        if (param) return '';
+        else return results;
+    },
+
+    setCookieParam: function(dict) {
+        $.each(dict, function(key,value) {
+            var getValue = this.getCookieValue(key);
+            if (getValue) {
+                document.cookie = document.cookie.replace(getValue, value);
+                return true;
+            } else {
+                document.cookie = key + '=' + value + '; ' + document.cookie;
+                return false;
+            }
+        });
+    },
+
+    checkAlphanumeric: function(str) {
+        return (str.search('([A-Za-z0-9]{' + str.length + '})') != -1);
+    },
+
+    checkEmail: function(str) {
+        var regex = '^(([^<>()\\[\\]\\\\.,;:\\s@"]+(\\.[^<>()\\[\\]\\\\.,;:\\s@"]+)*)|(".+"))';
+        regex += '@';
+        regex += '((\\[[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}])|(([a-zA-Z\\-0-9]+\\.)+[a-zA-Z]{2,}))$';
+        return (str.search(regex) != -1);
+    },
 
     GetURLParameter: function(param) {
         var url = String(window.location.search);
@@ -114,7 +127,41 @@ ShitpostView.prototype = {
         }
     },
 
+
+    /*--- Define general operation function ---*/
+
+    operate: function() {
+
+        // span must be odd
+        this.span = 9;
+        this.postsPerPage = 25;
+        this.page = 0;
+        this.lastID = -1;
+        this.totalPages = null;
+        this.isFirstBuild = true;
+
+        this.updateURL({
+            page: this.page
+        });
+
+        var node = $('.header');
+        //this.buildHeaderView(node);
+
+        node = $('.main');
+        this.buildNewShitpostEntryView(node);
+        var content =
+            '<div class="pagination"></div>' +
+            '<div class="shitEntries"></div>' +
+            '<div class="pagination"></div>';
+        $(content).appendTo(node);
+
+        this.getShitposts();
+        this.pollShitposts();
+    },
+
+
     /*--- Define communcation protocol to PHP controller ---*/
+
     getShitposts: function() {
         $.ajax({
             type: 'POST',
@@ -124,7 +171,7 @@ ShitpostView.prototype = {
                 func: 'getShitposts',
                 vars: {
                     lastID: this.lastID,
-                    user: this.GetURLParameter('user'),
+                    user: this.user,
                     page: this.GetURLParameter('page'),
                     postsPerPage: this.postsPerPage
                 }
@@ -132,8 +179,11 @@ ShitpostView.prototype = {
         }).done(function(data) {
             var dataArray = $.parseJSON(data);
 
-            if (data['Error']) {
-                this.debug(data['Error']);
+            if (dataArray['Error']) {
+                this.debug(dataArray['Error']);
+            }
+            if (!dataArray['verified']) {
+                this.completeLogout();
             }
 
             // If no new posts are returned, abort
@@ -159,6 +209,110 @@ ShitpostView.prototype = {
         });
     },
 
+
+    /*--- Define logout function ---*/
+
+    completeLogout: function() {
+        window.location.replace("./index.html");
+    },
+
+
+    /*--- Define view-building functions ---*/
+
+    buildLoginView: function(node) {
+        this.user = '';
+        // Build form content
+        var content =
+            '<div class="login">' +
+                    '<div class="userBlock">' +
+                        '<span class="user">User: </span><input id="userField" type="text" name="usr" value="' + this.user + '">' +
+                    '</div>' +
+                    '<div class="passwordBlock">' +
+                        '<span class="password">Password: </span><input id="passwordField" type="password" name="password">' +
+                    '</div>' +
+                    '<span class="error"></span><br>' +
+                    '<div id="loginButton" class="submitButton">LOGIN</div>' +
+            '</div>';
+        // Attach content
+        $(content).appendTo(node);
+
+        // Add button functionality here
+        var obj = this;
+        $('#loginButton').click(function () {
+            var tryUser = $('#userField').val();
+            var tryPassword = $('#passwordField').val();
+            if ((tryUser === null) || (tryUser === '')) {
+                $(".error").text('Please enter a user name.');
+            } else if (!obj.checkAlphanumeric(tryUser)) {
+                $(".error").text('User name should be entirely alphanumeric.');
+            } else if ((tryPassword === null) || (tryPassword === '')) {
+                $(".error").text('Please enter a password.');
+            } else if (!obj.checkAlphanumeric(tryPassword)) {
+                $(".error").text('Password should be entirely alphanumeric.');
+            } else {
+                $.ajax({
+                    type: 'POST',
+                    url: 'http://localhost/ShitpostController.php',
+                    context: obj,
+                    data: {
+                        func: 'attemptLogin',
+                        vars: {
+                            user: tryUser,
+                            password: tryPassword
+                        }
+                    }
+                }).done(function (data) {
+                    var dataArray = $.parseJSON(data);
+                    if (dataArray['Error']) {
+                        this.debug(dataArray['Error']);
+                    }
+                    if (!dataArray['verified']) {
+                        $(".error").text('Invalid login.');
+                    } else {
+                        this.user = dataArray['user'];
+                        $('.main').empty();
+                        this.operate();
+                    }
+                });
+            }
+        });
+    },
+    /*
+    buildHeaderView: function(node) {
+        var content =
+            '<div class="settings">settings</div>' +
+            '<div class="logout">logout</div>';
+        $(content).appendTo(node);
+
+        // Build header functionality
+        var obj = this;
+        $('.logout').click(function () {
+            obj.completeLogout();
+        });
+        $('.settings').click(function () {
+            var node = $('.main');
+            node.empty();
+            obj.buildSettingsView(node);
+        });
+    },
+
+    buildSettingsView: function(node) {
+        var content =
+            '<div class="newSettings">' +
+                '<div class="userBlock">' +
+                    '<span class="user">Current user name: ' + this.user + '</span>' +
+                    '<span class="user">New user name: </span><input id="userField" type="text" name="usr" value="' + this.user + '">' +
+                '</div>' +
+                '<div class="passwordBlock">' +
+                    '<span class="password">Old Password: </span><input id="oldPasswordField" type="password">' +
+                    '<span class="password">New Password: </span><input id="newPasswordField" type="password">' +
+                    '<span class="password">Confirm New Password: </span><input id="confirmPasswordField" type="password">' +
+                '</div>' +
+                '<span class="error"></span><br>' +
+                '<div id="changeButton" class="submitButton">CHANGE</div>' +
+            '</div>';
+    },
+    */
     buildPaginationView: function(total,node) {
         var halfSpan = (this.span - 1)/2;
         var first = this.page - halfSpan;
@@ -311,21 +465,22 @@ ShitpostView.prototype = {
                     data: {
                         func: 'createShitpost',
                         vars: {
-                            user: obj.GetURLParameter('user'),
+                            user: obj.user,
                             shitpost: newShitpost
                         }
                     }
                 }).done(function (data) {
-                    if (data['Error']) {
-                        obj.debug(data['Error']);
+                    var dataArray = $.parseJSON(data);
+                    if (dataArray['Error']) {
+                        this.debug(data['Error']);
                     }
                     $(".error").empty();
                     $('textarea').val('');
                     if (this.page != 0) {
-                        obj.updateURL({page: 0});
-                        obj.lastID = -1;
+                        this.updateURL({page: 0});
+                        this.lastID = -1;
                     }
-                    obj.getShitposts();
+                    this.getShitposts();
                 });
             }
         });
