@@ -16,7 +16,7 @@ ShitpostView.prototype = {
     debug: function(item) {
         var node = $('.test');
         var nodes = node.children();
-        while (nodes.length >= 5) {
+        while (nodes.length >= 20) {
             nodes.first().remove();
             nodes = node.children();
         }
@@ -128,17 +128,28 @@ ShitpostView.prototype = {
     },
 
 
+    getLastPostID: function() {
+        var node = $('.Entry').first();
+        return node.attr('id');
+    },
+
+    getLastPostDate: function() {
+        return $('.Date.'+this.getLastPostID()).text();
+    },
+
+
     /*--- Define general operation function ---*/
 
     operate: function() {
 
         // span must be odd
         this.span = 9;
-        this.postsPerPage = 25;
+        this.postsPerPage = 100;
         this.page = 0;
         this.lastID = -1;
         this.totalPages = null;
         this.isFirstBuild = true;
+        this.maxShitpostChars = 300;
 
         this.updateURL({
             page: this.page
@@ -163,9 +174,10 @@ ShitpostView.prototype = {
     /*--- Define communcation protocol to PHP controller ---*/
 
     getShitposts: function() {
+        var timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         $.ajax({
             type: 'POST',
-            url: 'http://localhost/ShitpostController.php',
+            url: './ShitpostController.php',
             context: this,
             data: {
                 func: 'getShitposts',
@@ -173,7 +185,8 @@ ShitpostView.prototype = {
                     lastID: this.lastID,
                     user: this.user,
                     page: this.GetURLParameter('page'),
-                    postsPerPage: this.postsPerPage
+                    postsPerPage: this.postsPerPage,
+                    timezone: timezone
                 }
             }
         }).done(function(data) {
@@ -188,6 +201,7 @@ ShitpostView.prototype = {
 
             // If no new posts are returned, abort
             if (dataArray['resultsArray'].length == 0) return;
+            if (this.lastID >= dataArray['resultsArray'][0]['shitID']) return;
             this.lastID = dataArray['resultsArray'][0]['shitID'];
 
             // Use returned JSON value 'totalPages' to build pagination if different than current totalPages
@@ -205,7 +219,8 @@ ShitpostView.prototype = {
             }
             // Use returned JSON to build html for shitpost entries
             node = $('.shitEntries');
-            this.buildShitpostEntriesView(dataArray['resultsArray'],node,isNewPage);
+            this.buildShitpostEntriesView(dataArray['resultsArray'], node, isNewPage);
+            dataArray['resultsArray'] = [];
         });
     },
 
@@ -220,21 +235,21 @@ ShitpostView.prototype = {
     /*--- Define view-building functions ---*/
 
     buildLoginView: function(node) {
-        this.user = '';
         // Build form content
         var content =
             '<div class="login">' +
-                    '<div class="userBlock">' +
-                        '<span class="user">User: </span><input id="userField" type="text" name="usr" value="' + this.user + '">' +
-                    '</div>' +
-                    '<div class="passwordBlock">' +
-                        '<span class="password">Password: </span><input id="passwordField" type="password" name="password">' +
-                    '</div>' +
-                    '<span class="error"></span><br>' +
-                    '<div id="loginButton" class="submitButton">LOGIN</div>' +
+                '<div class="userBlock">' +
+                    '<span class="user">User: </span><input id="userField" type="text" name="usr">' +
+                '</div>' +
+                '<div class="passwordBlock">' +
+                    '<span class="password">Password: </span><input id="passwordField" type="password" name="password">' +
+                '</div>' +
+                '<span class="error"></span><br>' +
+                '<button id="loginButton" class="submitButton">LOGIN</button>' +
             '</div>';
         // Attach content
         $(content).appendTo(node);
+        $('#userField').focus();
 
         // Add button functionality here
         var obj = this;
@@ -243,16 +258,20 @@ ShitpostView.prototype = {
             var tryPassword = $('#passwordField').val();
             if ((tryUser === null) || (tryUser === '')) {
                 $(".error").text('Please enter a user name.');
+                $('#userField').focus();
             } else if (!obj.checkAlphanumeric(tryUser)) {
                 $(".error").text('User name should be entirely alphanumeric.');
+                $('#userField').focus();
             } else if ((tryPassword === null) || (tryPassword === '')) {
                 $(".error").text('Please enter a password.');
+                $('#passwordField').focus();
             } else if (!obj.checkAlphanumeric(tryPassword)) {
                 $(".error").text('Password should be entirely alphanumeric.');
+                $('#passwordField').focus();
             } else {
                 $.ajax({
                     type: 'POST',
-                    url: 'http://localhost/ShitpostController.php',
+                    url: './ShitpostController.php',
                     context: obj,
                     data: {
                         func: 'attemptLogin',
@@ -400,17 +419,30 @@ ShitpostView.prototype = {
         }
     },
 
+    correctShitpostOverflow: function(shitpostID) {
+        var ID = '.Shitpost '+shitpostID;
+        if ($(ID)[0].scrollWidth >  $(ID).innerWidth()) {
+            var shitpost = $(ID).text();
+
+        }
+    },
+
     buildShitpostEntriesView: function(shitpostArray,node,isNewPage) {
         // Erase node contents
         if (isNewPage) node.empty();
         shitpostArray.reverse();
         var newDate = null;
+        var oldID = null;
         var nodes;
         var content = '';
 
+        if (!isNewPage) {
+            if (shitpostArray[0]['shitDate'] == this.getLastPostDate()) $('.Date.'+this.getLastPostID()).hide();
+        }
+        var obj = this;
         $.each(shitpostArray, function(i,shitpostData) {
             nodes = node.children();
-            if (!isNewPage) nodes.last().remove();
+            if (!isNewPage && (nodes.length >= obj.postsPerPage)) nodes.last().remove();
             var ID = 'post' + shitpostData['shitID'];
             content =
                 '<div id='+ID+' class="Entry">' +
@@ -423,44 +455,80 @@ ShitpostView.prototype = {
                         '<div class="Shitpost '+ID+'">'+shitpostData['shitPost']+'</div>' +
                     '</div>' +
                 '</div>';
-            if (newDate !== shitpostData['shitDate']) {
-                newDate = shitpostData['shitDate'];
-            } else {
-                $('.Date, .'+ID).hide();
-            }
             $(node).prepend(content);
+            if (newDate == null) {
+                newDate = shitpostData['shitDate'];
+            }
+            if ((newDate != shitpostData['shitDate'])) {
+                newDate = shitpostData['shitDate'];
+                $('.Date.'+oldID).show();
+            }
+            $('.Date.'+ID).hide();
+            oldID = ID;
         });
-        $('.Date, .'+this.lastID).hide();
+        $('.Date.'+oldID).show();
         var temp = shitpostArray[shitpostArray.length-1];
         this.lastID = temp['shitID'];
     },
 
+    remove_xss: function(text) {
+        var regex = /<script.+<\/script>/g;
+        text = text.replace(regex, '');
+        regex = /<form.+<\/form>/g;
+        text = text.replace(regex, '');
+        return text;
+    },
+
     buildNewShitpostEntryView: function(node) {
-        // Build form content
+        /*-- Build form content --*/
         var content =
             '<div class="newEntry">' +
                 '<div>' +
-                    '<div class="userBar">User: '+this.user+'</div>' +
+                    '<div class="userBar">' +
+                        '<div>User: '+this.user+'</div><div id="shitpostCharsLeft">'+this.maxShitpostChars+'</div>' +
+                    '</div>' +
                     '<div>' +
-                        '<textarea name="newEntry" rows="8" cols="80"></textarea><br>' +
+                        '<textarea name="newEntry" id="newEntry" rows="8" cols="80"></textarea><br>' +
                         '<span class="error"></span><br>' +
                     '</div>' +
-                '<div class="submitButton">SHITPOST!</div>' +
+                '<button class="submitButton">SHITPOST!</button>' +
             '</div>' +
             '</div>';
         // Attach content
         $(content).appendTo(node);
 
-        // Build form functionality
+        /*-- Build form functionality --*/
         var obj = this;
+        var textareaNode = $('textarea[name="newEntry"]');
+        $(textareaNode).focus();
+
+        // Build live character count functionality
+        textareaNode.on("keyup keydown", function() {
+            var shitpostCharsLeft = obj.maxShitpostChars - $(this).val().length;
+            $('#shitpostCharsLeft').text(shitpostCharsLeft);
+        });
+
+        // Build shitpost submission functionality
         $('.submitButton').click(function () {
-            var newShitpost = $('textarea[name="newEntry"]').val();
+            var newShitpost = textareaNode.val();
+            newShitpost = obj.remove_xss(newShitpost);
             if ((newShitpost === null) || (newShitpost === '')) {
                 $(".error").text('Empty shitposts not allowed!');
+                $(textareaNode).val('');
+                $('#shitpostCharsLeft').text(obj.maxShitpostChars);
+            } else if (newShitpost.replace(/\s+/g, '') == '') {
+                $(".error").text('Empty shitposts not allowed!');
+                $(textareaNode).val('');
+                $('#shitpostCharsLeft').text(obj.maxShitpostChars);
+            } else if (newShitpost.length > obj.maxShitpostChars) {
+                $(".error").text('Post over length by ' + (newShitpost.length - obj.maxShitpostChars) + ' characters');
             } else {
+                $(textareaNode).val('');
+                $('#shitpostCharsLeft').text(obj.maxShitpostChars);
+                $(textareaNode).focus();
                 $.ajax({
                     type: 'POST',
-                    url: 'http://localhost/ShitpostController.php',
+                    url: './ShitpostController.php',
                     context: obj,
                     data: {
                         func: 'createShitpost',
@@ -475,7 +543,6 @@ ShitpostView.prototype = {
                         this.debug(data['Error']);
                     }
                     $(".error").empty();
-                    $('textarea').val('');
                     if (this.page != 0) {
                         this.updateURL({page: 0});
                         this.lastID = -1;

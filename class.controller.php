@@ -61,7 +61,7 @@ class controller
     }
 
     private function generateToken($user) {
-        $token = md5($user.$_SESSION['REMOTE_ADDR']);
+        $token = md5($user.$_SERVER['HTTP_X_FORWARDED_FOR']);
         return $token;
     }
 
@@ -103,6 +103,7 @@ class controller
         }
     }
 
+    /*--- Shitpost formatting helper functions --- */
     private function make_clickable($text) {
         $regex = '#(^|\s)https?://[^\s()<>]+(?:\([\w\d]+\)|([^[:punct:]\s]|/))#';
         return preg_replace_callback($regex, function ($matches) {
@@ -112,9 +113,29 @@ class controller
                 $returnURL = substr($returnURL, 1);
                 $addSpace = " ";
             }
-            return $addSpace . "<a href=\'{$returnURL}\'>{$returnURL}</a>";
+            return $addSpace . "<a href=\"{$returnURL}\" target=\"_blank\">{$returnURL}</a>";
         }, $text);
     }
+
+    private function contain_embedded_video($text) {
+        $newText = str_replace("<iframe","<div class=\"video-container\"><iframe",$text);
+        $newText = str_replace("</iframe>","</iframe></div>",$newText);
+        return $newText;
+    }
+
+    private function escape_multispace($text) {
+        $regex = '#( ){2,}#';
+        return preg_replace_callback($regex, function ($matches) {
+            $match = $matches[0];
+            $newText = '';
+            for ($i = 0; $i < strlen($match); $i++) {
+                $newText .= '&nbsp;';
+            }
+            return $newText;
+        }, $text);
+    }
+
+    /*-------------------------------------------- */
 
     public function perform($action) {
         try {
@@ -139,9 +160,6 @@ class controller
                         "",
                         "password"
                     )[0]['password'];
-
-
-
 
                     $verified = password_verify($pass,$hash);
                     if (!$verified) return false;
@@ -178,6 +196,7 @@ class controller
                     $firstID = (int)$_POST['vars']['lastID'];
                     $page = (int)$_POST['vars']['page'];
                     $postsPerPage = (int)$_POST['vars']['postsPerPage'];
+                    $timezone = $_POST['vars']['timezone'];
 
                     // Count entries
                     $field = "COUNT(*)";
@@ -230,7 +249,11 @@ class controller
                         foreach ($resultArray as $result) {
                             $shitID = $result['Id'];
 
-                            $dateArray = explode(" ", $result["Date"]);
+                            $newDate = DateTime::createFromFormat('Y-m-d H:i:s', $result['Date']);
+                            $newDate->setTimeZone(new DateTimeZone($timezone));
+                            $newDate = $newDate->format('Y-m-d H:i:s');
+
+                            $dateArray = explode(" ", $newDate);
                             $shitDate = $dateArray[0];
 
                             $shitTime = "@" . $dateArray[1];
@@ -238,7 +261,9 @@ class controller
                             $shitUser = ($result['User'] != $user) ? $result['User'] : "You";
 
                             $shitPost = str_replace("\n", "<br>", $result['Shit']);
+                            $shitPost = trim($shitPost);
                             $shitPost = $this->make_clickable($shitPost);
+                            $shitPost = $this->contain_embedded_video($shitPost);
 
                             array_push($viewResultArray, array(
                                 "shitID" => $shitID,
@@ -272,6 +297,7 @@ class controller
                     $shitpost = $_POST['vars']['shitpost'];
 
                     // Shitpost sanitisation will occur here
+                    $shitpost = $this->escape_multispace($shitpost);
 
                     $newEntry = array(
                         "Date" => date('Y-m-d H:i:s'),
