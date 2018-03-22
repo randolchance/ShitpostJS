@@ -503,7 +503,7 @@ ShitpostView.prototype = {
         $(textareaNode).focus();
 
         // Build live character count functionality
-        textareaNode.on("keyup keydown", function() {
+        textareaNode.on("keyup keydown", function(event) {
             var shitpostCharsLeft = obj.maxShitpostChars - $(this).val().length;
             $('#shitpostCharsLeft').text(shitpostCharsLeft);
         });
